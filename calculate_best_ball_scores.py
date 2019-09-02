@@ -115,22 +115,24 @@ def parse_args():
         required=False)
     parser.add_argument(
         '-b', '--num_rb',
-        help='Number of Starting Running Backs in your league', required=False,
-        default=2, type=int)
-    parser.add_argument(
-        '-r', '--num_wr',
-        help='Number of Starting Wide Receivers in your league',
+        help='Number of Starting Running Backs in your league (Default 2)', 
         required=False, default=2, type=int)
     parser.add_argument(
-        '-q', '--num_qb', help='Number of Starting Quarterbacks in your league',
+        '-r', '--num_wr',
+        help='Number of Starting Wide Receivers in your league (Default 2)',
+        required=False, default=2, type=int)
+    parser.add_argument(
+        '-q', '--num_qb', 
+        help='Number of Starting Quarterbacks in your league (Default 1)',
         required=False, default=1, type=int)
     parser.add_argument(
-        '-t', '--num_te', help='Number of Starting Tight Ends in your league',
+        '-t', '--num_te', 
+        help='Number of Starting Tight Ends in your league (Default 1)',
         required=False, default=1, type=int)
     parser.add_argument(
         '-f', '--num_flex',
-        help='Number of Starting Flex(WR/RB/TE) in your league', required=False,
-        default=2, type=int)
+        help='Number of Starting Flex(WR/RB/TE) in your league (Default 2)', 
+        required=False, default=2, type=int)
     return vars(parser.parse_args())
 
 if __name__ == "__main__":
