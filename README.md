@@ -70,6 +70,7 @@ Team 12             144.4
 ```
 ### Calculate the best ball scores for a 12 team league for 2019 from Week 1 to 3
 ```
+$ python fantasy_football.py -i 123456789012345678 -y 2019 -e 3
 Team                Score
 Team 1              198.3
 Team 2              215.2
