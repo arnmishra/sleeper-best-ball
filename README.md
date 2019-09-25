@@ -17,6 +17,9 @@ optional arguments:
   -y YEAR, --year YEAR  Which year to work with (i.e. 2018).
   -w WEEK, --week WEEK  Which week to work with (i.e. 1), for full season
                         leave blank
+  -e END_WEEK, --end_week END_WEEK
+                        Sum of all weeks till the end week. Default to 13 for
+                        13 week season.
   -b NUM_RB, --num_rb NUM_RB
                         Number of Starting Running Backs in your league (Default 2)
   -r NUM_WR, --num_wr NUM_WR
@@ -64,4 +67,20 @@ Team 9              122.9
 Team 10             123.1
 Team 11             137.5
 Team 12             144.4
+```
+### Calculate the best ball scores for a 12 team league for 2019 from Week 1 to 3
+```
+Team                Score
+Team 1              198.3
+Team 2              215.2
+Team 3              220.1
+Team 4              224.5
+Team 5              247.8
+Team 6              248.1
+Team 7              249.4
+Team 8              255.2
+Team 9              263.1
+Team 10             272.5
+Team 11             281.1
+Team 12             285.9
 ```

@@ -114,6 +114,10 @@ def parse_args():
         help='Which week to work with (i.e. 1), for full season leave blank',
         required=False)
     parser.add_argument(
+        '-e', '--end_week',
+        help='Sum of all weeks till the end week. Default to 13 for 13 week season.',
+        required=False, default=13, type=int)
+    parser.add_argument(
         '-b', '--num_rb',
         help='Number of Starting Running Backs in your league (Default 2)', 
         required=False, default=2, type=int)
@@ -140,6 +144,7 @@ if __name__ == "__main__":
     league_id = args['league_id']
     year = args['year']
     week = args['week']
+    end_week = args['end_week']
     roster_count = {}
     roster_count['rb'] = args['num_rb']
     roster_count['wr'] = args['num_wr']
@@ -157,9 +162,7 @@ if __name__ == "__main__":
         final_owner_to_score = get_owner_to_score(
             owner_to_roster, player_to_points, player_id_to_info, roster_count)
     else:
-        # We only care about up to week 13 since thats the end of the fantasy
-        # regular season.
-        for week in range(1,14):
+        for week in range(1, end_week + 1):
             owner_to_roster = get_owner_to_roster(
                 roster_id_to_owner, league_id, week)
             player_to_points = get_player_to_points(
