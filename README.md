@@ -38,7 +38,7 @@ optional arguments:
 
 ### Calculate the best ball scores for a 12 team league for 2018
 ```
-$ python fantasy_football.py -i 123456789012345678 -y 2018
+$ python calculate_best_ball_scores.py -i 123456789012345678 -y 2018
 Team                Score               Record(W-L-T)
 Team 1              1251.0              0-12-0
 Team 2              1384.8              0-12-0
@@ -55,7 +55,7 @@ Team 12             1668.6              12-0-0
 ```
 ### Calculate the best ball scores for a 12 team league for 2018's Week 1
 ```
-$ python fantasy_football.py -i 123456789012345678 -y 2018 -w 1
+$ python calculate_best_ball_scores.py -i 123456789012345678 -y 2018 -w 1
 Team                Score               Record(W-L-T)
 Team 1              93.8                0-1-0
 Team 2              98.3                0-1-0
@@ -72,7 +72,7 @@ Team 12             144.4               1-0-0
 ```
 ### Calculate the best ball scores for a 12 team league for 2019 from Week 1 to 3
 ```
-$ python fantasy_football.py -i 123456789012345678 -y 2019 -e 3
+$ python calculate_best_ball_scores.py -i 123456789012345678 -y 2019 -e 3
 Team                Score               Record(W-L-T)
 Team 1              198.3               0-3-0
 Team 2              215.2               0-3-0
@@ -89,6 +89,7 @@ Team 12             285.9               3-0-0
 ```
 ### Calculate the best ball records for a 12 team league for 2019 from Week 1 to 8
 ```
+$ python calculate_best_ball_scores.py  -i 123456789012345678 -y 2019 -e 8 -s record
 Team                Record(W-L-T)       Score
 Team 1              1-7-0               893.9
 Team 2              2-6-0               883.5
