@@ -124,6 +124,11 @@ def get_owner_to_weekly_record(matchup_id_to_owners, final_owner_to_score):
             owner_to_record[owner_2] = [1, 0, 0]
     return owner_to_record
 
+def get_owner_to_average_place(final_owner_to_score):
+    owner_to_average_place = {}
+    owner_to_top_half_or_bottom = {}
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Get Sleeper App Best Ball Scores')
@@ -163,7 +168,7 @@ def parse_args():
         required=False, default=2, type=int)
     parser.add_argument(
         '-s', '--sort_by',
-        help='Sort by "score" or "record". (Default Score)',
+        help='Sort by score, record, rank, top6. (Default Score)',
         required=False, default='score', type=str)
     return vars(parser.parse_args())
 
@@ -185,6 +190,8 @@ if __name__ == "__main__":
     player_id_to_info = get_player_id_to_info()
     final_owner_to_score = {}
     final_owner_to_record = {}
+    final_owner_to_rank = {}
+    final_owner_to_top_half_or_bottom = {}
     if week:
         player_to_points = get_player_to_points(year, week, player_id_to_info)
         owner_to_roster, matchup_id_to_owners = get_owner_to_roster(
@@ -193,6 +200,12 @@ if __name__ == "__main__":
             owner_to_roster, player_to_points, player_id_to_info, roster_count)
         final_owner_to_record = get_owner_to_weekly_record(
             matchup_id_to_owners, final_owner_to_score)
+        sorted_by_score = sorted(final_owner_to_score.items(), key=lambda kv: kv[1])
+        for i in range(len(sorted_by_score)):
+                owner = sorted_by_score[i][0]
+                final_owner_to_rank[owner] = [i+1]
+                if(i >= 6):
+                    final_owner_to_top_half_or_bottom[owner] = 1
     else:
         for week in range(1, end_week + 1):
             owner_to_roster, matchup_id_to_owners = get_owner_to_roster(
@@ -213,18 +226,53 @@ if __name__ == "__main__":
                 else:
                     final_owner_to_score[owner] = owner_to_score[owner]
                     final_owner_to_record[owner] = owner_to_record[owner]
+            # creates list of tuple of (owner, score) sorted by score
+            sorted_by_score = sorted(final_owner_to_score.items(), key=lambda kv: kv[1])
+            num_teams = len(sorted_by_score)
+            for i in range(num_teams):
+                owner = sorted_by_score[i][0]
+                if owner in final_owner_to_rank:
+                    final_owner_to_rank[owner].append(num_teams-i)
+                else:
+                    final_owner_to_rank[owner] = [num_teams-i]
+                if(i >= 6):
+                    if owner in final_owner_to_top_half_or_bottom:
+                        final_owner_to_top_half_or_bottom[owner] += 1
+                    else:
+                        final_owner_to_top_half_or_bottom[owner] = 1
 
     for owner in final_owner_to_record:
         final_owner_to_record[owner] = ("-").join([str(elem) for elem in final_owner_to_record[owner]])
+        final_owner_to_rank[owner] = round(float(sum(final_owner_to_rank[owner])) / len(final_owner_to_rank[owner]), 2)
+        if owner not in final_owner_to_top_half_or_bottom:
+            final_owner_to_top_half_or_bottom[owner] = 0
     if args['sort_by'] == 'record':
         sorted_records = final_owner_to_record.items()
         sorted_records.sort(key=lambda tup: tup[1]) # sort by the records
-        print("{0:<20}{1:<20}{2:<20}".format('Team', 'Record(W-L-T)', 'Score'))
+        print("{0:<20}{1:<20}{2:<20}{3:<20}{4:<20}".format('Team', 'Record(W-L-T)', 'Score', 'Top 6 Performances', 'Average Rank'))
         for record in sorted_records:
-            print("{0:<20}{1:<20}{2:<20}".format(record[0], record[1], final_owner_to_score[record[0]]))
-    else:
+            owner = record[0]
+            print("{0:<20}{1:<20}{2:<20}{3:<20}{4:<20}".format(owner, record[1], final_owner_to_score[owner], final_owner_to_top_half_or_bottom[owner], final_owner_to_rank[owner]))
+    elif args['sort_by'] == 'rank':
+        sorted_rank = final_owner_to_rank.items()
+        sorted_rank.sort(key=lambda tup: tup[1], reverse=True) # sort by the ranks
+        print("{0:<20}{1:<20}{2:<20}{3:<20}{4:<20}".format('Team', 'Average Rank', 'Score', 'Record(W-L-T)', 'Top 6 Performances'))
+        for rank in sorted_rank:
+            owner = rank[0]
+            print("{0:<20}{1:<20}{2:<20}{3:<20}{4:<20}".format(owner, rank[1], final_owner_to_score[owner], final_owner_to_record[owner], final_owner_to_top_half_or_bottom[owner]))
+    elif args['sort_by'] == 'top6':
+        sorted_top6 = final_owner_to_top_half_or_bottom.items()
+        sorted_top6.sort(key=lambda tup: tup[1]) # sort by the top 6 performances
+        print("{0:<20}{1:<20}{2:<20}{3:<20}{4:<20}".format('Team', 'Top 6 Performances', 'Score', 'Record(W-L-T)', 'Average Rank'))
+        for top6 in sorted_top6:
+            owner = top6[0]
+            print("{0:<20}{1:<20}{2:<20}{3:<20}{4:<20}".format(owner, top6[1], final_owner_to_score[owner], final_owner_to_record[owner], final_owner_to_rank[owner]))
+    elif args['sort_by'] == 'score':
         sorted_scores = final_owner_to_score.items()
         sorted_scores.sort(key=lambda tup: tup[1]) # sort by the scores
-        print("{0:<20}{1:<20}{2:<20}".format('Team', 'Score', 'Record(W-L-T)'))
+        print("{0:<20}{1:<20}{2:<20}{3:<20}{4:<20}".format('Team', 'Score', 'Record(W-L-T)', 'Top 6 Performances', 'Average Rank'))
         for score in sorted_scores:
-            print("{0:<20}{1:<20}{2:<20}".format(score[0], score[1], final_owner_to_record[score[0]]))
+            owner = score[0]
+            print("{0:<20}{1:<20}{2:<20}{3:<20}{4:<20}".format(owner, score[1], final_owner_to_record[owner], final_owner_to_top_half_or_bottom[owner], final_owner_to_rank[owner]))
+    else:
+        print("Please enter either 'score', 'record', 'rank', or 'top6' for the sort option. %s isn't recognized" % args['sort_by'])
