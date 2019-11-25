@@ -192,6 +192,7 @@ if __name__ == "__main__":
     final_owner_to_record = {}
     final_owner_to_rank = {}
     final_owner_to_top_half_or_bottom = {}
+    num_teams = len(user_id_to_team_name)
     if week:
         player_to_points = get_player_to_points(year, week, player_id_to_info)
         owner_to_roster, matchup_id_to_owners = get_owner_to_roster(
@@ -203,7 +204,7 @@ if __name__ == "__main__":
         sorted_by_score = sorted(final_owner_to_score.items(), key=lambda kv: kv[1])
         for i in range(len(sorted_by_score)):
                 owner = sorted_by_score[i][0]
-                final_owner_to_rank[owner] = [i+1]
+                final_owner_to_rank[owner] = [num_teams-i]
                 if(i >= 6):
                     final_owner_to_top_half_or_bottom[owner] = 1
     else:
@@ -228,7 +229,6 @@ if __name__ == "__main__":
                     final_owner_to_record[owner] = owner_to_record[owner]
             # creates list of tuple of (owner, score) sorted by score
             sorted_by_score = sorted(final_owner_to_score.items(), key=lambda kv: kv[1])
-            num_teams = len(sorted_by_score)
             for i in range(num_teams):
                 owner = sorted_by_score[i][0]
                 if owner in final_owner_to_rank:
