@@ -248,7 +248,7 @@ if __name__ == "__main__":
             final_owner_to_top_half_or_bottom[owner] = 0
     if args['sort_by'] == 'record':
         sorted_records = final_owner_to_record.items()
-        sorted_records.sort(key=lambda tup: tup[1]) # sort by the records
+        sorted_records.sort(key=lambda tup: int(tup[1].split("-")[0])) # sort by the records
         print("{0:<20}{1:<20}{2:<20}{3:<20}{4:<20}".format('Team', 'Record(W-L-T)', 'Score', 'Top 6 Performances', 'Average Rank'))
         for record in sorted_records:
             owner = record[0]
