@@ -1,3 +1,7 @@
+# NOTE: This project is broken for now
+
+Sleeper has removed its stats API. From them: "Hi, we have removed that for now as we’re acquiring another data provider. It may go back up, but right now, we don’t have an eta for that." Furthemore, ESPN has changed the way they manage their live stats, so other projects like [NFL Game](https://github.com/derek-adair/nflgame) no longer work either. Therefore, there is no easy way to get the fantasy points for individual players. I also made a few attempts at using scrapers or tools like puppeteers on some available public databases but most of it proved to be blocked or requiring paid accounts so this project is on hold for now.
+
 # sleeper-best-ball
 Compute Best Ball scores on your https://sleeper.app/ league
 
