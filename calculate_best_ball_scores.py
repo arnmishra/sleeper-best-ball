@@ -1,8 +1,12 @@
 from enum import Enum
 import requests
 import argparse
+import nflgame
 
 def get_user_id_to_team_name(league_id):
+    """
+    Gets a map of fantasy player user id to their team name
+    """
     user_id_to_team_name = {}
     r = requests.get("https://api.sleeper.app/v1/league/%s/users" % league_id)
     user_data = r.json()
@@ -11,6 +15,9 @@ def get_user_id_to_team_name(league_id):
     return user_id_to_team_name
 
 def get_roster_id_to_owner(user_id_to_team_name, league_id):
+    """
+    Gets a map of the roster id to the fantasy owner team name
+    """
     roster_id_to_owner = {}
     r = requests.get('https://api.sleeper.app/v1/league/%s/rosters' % league_id)
     roster_info = r.json()
@@ -19,7 +26,12 @@ def get_roster_id_to_owner(user_id_to_team_name, league_id):
         roster_id_to_owner[roster['roster_id']] = name
     return roster_id_to_owner
 
-def get_owner_to_roster(roster_id_to_owner, league_id, week):
+def get_owner_to_roster(player_id_to_custom_id, roster_id_to_owner, league_id, week):
+    """
+    Gets a map of the owner team name to the roster players
+    Also determines which two teams are in each matchup by getting a map of
+    matchu pid to the two owners playing the game
+    """
     owner_to_roster = {}
     matchup_id_to_owners = {}
     r = requests.get('https://api.sleeper.app/v1/league/%s/matchups/%s' %
@@ -27,7 +39,9 @@ def get_owner_to_roster(roster_id_to_owner, league_id, week):
     rosters = r.json()
     for roster in rosters:
         owner = roster_id_to_owner[roster['roster_id']]
-        owner_to_roster[owner] = roster['players']
+        player_ids = roster['players']
+        custom_ids = [player_id_to_custom_id[player_id] for player_id in player_ids]
+        owner_to_roster[owner] = custom_ids
         matchup_id = roster['matchup_id']
         if matchup_id in matchup_id_to_owners:
             matchup_id_to_owners[matchup_id].append(owner)
@@ -35,8 +49,21 @@ def get_owner_to_roster(roster_id_to_owner, league_id, week):
             matchup_id_to_owners[matchup_id] = [owner]
     return owner_to_roster, matchup_id_to_owners
 
-def get_player_id_to_info():
-    player_id_to_info = {}
+def get_player_id(first_name, last_name, team):
+    """
+    Returns a custom player ID of first initial + last name + team
+    i.e. for Tom Brady in New England that is T.Brady-NE
+    """
+    if (team == None):
+        team = 'None'
+    return first_name[0] + "." + last_name + "-" + team
+
+def get_custom_id_to_info():
+    """
+    Gets a map of player name/team to position
+    """
+    custom_id_to_info = {}
+    player_id_to_custom_id = {}
     r = requests.get('https://api.sleeper.app/v1/players/nfl')
     players = r.json()
     for player_id in players:
@@ -44,28 +71,39 @@ def get_player_id_to_info():
         if player['fantasy_positions']:
             position = player['fantasy_positions'][0]
             if position in ('RB', 'WR', 'QB', 'TE'):
-                player_id_to_info[player_id] = (
-                    player['search_full_name'], position)
-            else:
-                continue
-    return player_id_to_info
+                custom_id = get_player_id(player['first_name'], player['last_name'], player['team'])
+                if not custom_id:
+                    continue
+                player_id_to_custom_id[player_id] = custom_id
+                custom_id_to_info[custom_id] = position
+    return custom_id_to_info, player_id_to_custom_id
 
-def get_player_to_points(year, week, player_id_to_info):
+def calculate_player_points(player):
+    rushing_score = player.rushing_yds * 0.1 + player.rushing_tds * 6 + player.rushing_twoptm * 2
+    passing_score = player.passing_yds * 0.04 + player.passing_tds * 4 + player.passing_twoptm * 2
+    receiving_score = player.receiving_yds * 0.1 + player.receiving_tds * 6 + player.receiving_rec * 0.5 + player.receiving_twoptm * 2
+    negative_scores = player.passing_ints * 2 + player.fumbles_lost * 2
+    return rushing_score + passing_score + receiving_score - negative_scores
+
+def get_player_to_points(year, week, custom_id_to_info):
+    """
+    Gets a map of player ID to a tuple of the player's points and position
+    """
     player_id_to_points = {}
-    r = requests.get('https://api.sleeper.app/v1/stats/nfl/regular/%s/%s' %
-        (year, week))
-    players = r.json()
-    for player_id in players:
-        if ('pts_half_ppr' in players[player_id]
-            and player_id in player_id_to_info):
-            player_id_to_points[player_id] = (
-                players[player_id]['pts_half_ppr'], player_id_to_info[player_id]
-                )
-        else:
-            continue
+    games = nflgame.games(int(year), week=int(week))
+    players = nflgame.combine_game_stats(games)
+    for player in players:
+        custom_id = player.name + "-" + player.team
+        if (custom_id in custom_id_to_info):
+            points = calculate_player_points(player)
+            player_id_to_points[custom_id] = (points, custom_id_to_info[custom_id])
+    print (player_id_to_points)
     return player_id_to_points
 
 def get_points(rbs, wrs, qbs, tes, roster_count):
+    """
+    Gets the number of points a set of players makes up given the roster counts
+    """
     flex = rbs[roster_count['rb']:] + \
            wrs[roster_count['wr']:] + \
            tes[roster_count['te']:]
@@ -76,8 +114,10 @@ def get_points(rbs, wrs, qbs, tes, roster_count):
            sum(tes[:roster_count['te']]) + \
            sum(flex[:roster_count['flex']])
 
-def get_owner_to_score(
-    owner_to_roster, player_to_points, player_id_to_info, roster_count):
+def get_owner_to_score(owner_to_roster, player_to_points, roster_count):
+    """
+    Gets a map of the owner to their fantasy score
+    """
     owner_to_score = {}
     for owner in owner_to_roster:
         rbs = []
@@ -86,7 +126,7 @@ def get_owner_to_score(
         tes = []
         for player in owner_to_roster[owner]:
             if player in player_to_points:
-                points, (fullname, position) = player_to_points[player]
+                points, position = player_to_points[player]
                 if position == 'RB':
                     rbs.append(points)
                 elif position == 'WR':
@@ -95,10 +135,6 @@ def get_owner_to_score(
                     qbs.append(points)
                 elif position == 'TE':
                     tes.append(points)
-                else:
-                    continue
-            else:
-                continue
         rbs.sort(reverse=True)
         wrs.sort(reverse=True)
         qbs.sort(reverse=True)
@@ -107,6 +143,9 @@ def get_owner_to_score(
     return owner_to_score
 
 def get_owner_to_weekly_record(matchup_id_to_owners, final_owner_to_score):
+    """
+    Gets a map of the owner to their best ball record
+    """
     owner_to_record = {}
     for matchup_id in matchup_id_to_owners:
         owner_1 = matchup_id_to_owners[matchup_id][0]
@@ -123,11 +162,6 @@ def get_owner_to_weekly_record(matchup_id_to_owners, final_owner_to_score):
             owner_to_record[owner_1] = [0, 1, 0]
             owner_to_record[owner_2] = [1, 0, 0]
     return owner_to_record
-
-def get_owner_to_average_place(final_owner_to_score):
-    owner_to_average_place = {}
-    owner_to_top_half_or_bottom = {}
-
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -173,6 +207,7 @@ def parse_args():
     return vars(parser.parse_args())
 
 if __name__ == "__main__":
+    "Parses all the arguments into variables"
     args = parse_args()
     league_id = args['league_id']
     year = args['year']
@@ -185,22 +220,34 @@ if __name__ == "__main__":
     roster_count['te'] = args['num_te']
     roster_count['flex'] = args['num_flex']
 
+    # Gets a map of the user id to the owner team name
     user_id_to_team_name = get_user_id_to_team_name(league_id)
+    # Gets a map of the roster id to the owner team name
     roster_id_to_owner = get_roster_id_to_owner(user_id_to_team_name, league_id)
-    player_id_to_info = get_player_id_to_info()
+    # Gets a map of each player id to their name and position
+    custom_id_to_info, player_id_to_custom_id = get_custom_id_to_info()
+    # A map to track the owner name to its best ball score
     final_owner_to_score = {}
+    # A map of each owner to their best ball record
     final_owner_to_record = {}
+    # A map of each owner to their best ball rank
     final_owner_to_rank = {}
+    # A map of each owner to number of top 6 best ball performances
     final_owner_to_top_half_or_bottom = {}
     num_teams = len(user_id_to_team_name)
     if week:
-        player_to_points = get_player_to_points(year, week, player_id_to_info)
+        # If we are getting it for an individual week, calculate that data
+        # Get the number of fantasy points each player scored that week
+        player_to_points = get_player_to_points(year, week, custom_id_to_info)
+        # Gets the map of each owner to their players and which two teams are playing each other
         owner_to_roster, matchup_id_to_owners = get_owner_to_roster(
-            roster_id_to_owner, league_id, week)
-        final_owner_to_score = get_owner_to_score(
-            owner_to_roster, player_to_points, player_id_to_info, roster_count)
+            player_id_to_custom_id, roster_id_to_owner, league_id, week)
+        # Gets the best ball score for each owner
+        final_owner_to_score = get_owner_to_score(owner_to_roster, player_to_points, roster_count)
+        # Gets the best ball record for each owner
         final_owner_to_record = get_owner_to_weekly_record(
             matchup_id_to_owners, final_owner_to_score)
+        # Sorts the teams by score and determines if they are top 6
         sorted_by_score = sorted(final_owner_to_score.items(), key=lambda kv: kv[1])
         for i in range(len(sorted_by_score)):
                 owner = sorted_by_score[i][0]
@@ -208,16 +255,19 @@ if __name__ == "__main__":
                 if(i >= 6):
                     final_owner_to_top_half_or_bottom[owner] = 1
     else:
+        # If we are getting it for the whole season, calculate that data for each week
         for week in range(1, end_week + 1):
+            # Get the number of fantasy points each player scored that week
+            player_to_points = get_player_to_points(year, week, custom_id_to_info)
+            # Gets the map of each owner to their players and which two teams are playing each other
             owner_to_roster, matchup_id_to_owners = get_owner_to_roster(
-                roster_id_to_owner, league_id, week)
-            player_to_points = get_player_to_points(
-                year, week, player_id_to_info)
-            owner_to_score = get_owner_to_score(
-                owner_to_roster, player_to_points, player_id_to_info, 
-                roster_count)
+                player_id_to_custom_id, roster_id_to_owner, league_id, week)
+            # Gets the best ball score for each owner
+            owner_to_score = get_owner_to_score(owner_to_roster, player_to_points, roster_count)
+            # Gets the best ball record for each owner
             owner_to_record = get_owner_to_weekly_record(
                 matchup_id_to_owners, owner_to_score)
+            # Adds the total scores and records for each team
             for owner in owner_to_score:
                 if owner in final_owner_to_score:
                     final_owner_to_score[owner] += owner_to_score[owner]
@@ -227,8 +277,9 @@ if __name__ == "__main__":
                 else:
                     final_owner_to_score[owner] = owner_to_score[owner]
                     final_owner_to_record[owner] = owner_to_record[owner]
-            # creates list of tuple of (owner, score) sorted by score
+            # Creates list of tuple of (owner, score) sorted by score
             sorted_by_score = sorted(final_owner_to_score.items(), key=lambda kv: kv[1])
+            # Sorts the teams by score and determines if they are top 6
             for i in range(num_teams):
                 owner = sorted_by_score[i][0]
                 if owner in final_owner_to_rank:
@@ -241,6 +292,7 @@ if __name__ == "__main__":
                     else:
                         final_owner_to_top_half_or_bottom[owner] = 1
 
+    # Prints out all the information sorted as the user wants
     for owner in final_owner_to_record:
         final_owner_to_record[owner] = ("-").join([str(elem) for elem in final_owner_to_record[owner]])
         final_owner_to_rank[owner] = round(float(sum(final_owner_to_rank[owner])) / len(final_owner_to_rank[owner]), 2)
@@ -248,28 +300,28 @@ if __name__ == "__main__":
             final_owner_to_top_half_or_bottom[owner] = 0
     if args['sort_by'] == 'record':
         sorted_records = final_owner_to_record.items()
-        sorted_records.sort(key=lambda tup: int(tup[1].split("-")[0])) # sort by the records
+        sorted_records = sorted(sorted_records, key=lambda tup: int(tup[1].split("-")[0])) # sort by the records
         print("{0:<20}{1:<20}{2:<20}{3:<20}{4:<20}".format('Team', 'Record(W-L-T)', 'Score', 'Top 6 Performances', 'Average Rank'))
         for record in sorted_records:
             owner = record[0]
             print("{0:<20}{1:<20}{2:<20}{3:<20}{4:<20}".format(owner, record[1], final_owner_to_score[owner], final_owner_to_top_half_or_bottom[owner], final_owner_to_rank[owner]))
     elif args['sort_by'] == 'rank':
         sorted_rank = final_owner_to_rank.items()
-        sorted_rank.sort(key=lambda tup: tup[1], reverse=True) # sort by the ranks
+        sorted_rank = sorted(sorted_rank, key=lambda tup: tup[1], reverse=True) # sort by the ranks
         print("{0:<20}{1:<20}{2:<20}{3:<20}{4:<20}".format('Team', 'Average Rank', 'Score', 'Record(W-L-T)', 'Top 6 Performances'))
         for rank in sorted_rank:
             owner = rank[0]
             print("{0:<20}{1:<20}{2:<20}{3:<20}{4:<20}".format(owner, rank[1], final_owner_to_score[owner], final_owner_to_record[owner], final_owner_to_top_half_or_bottom[owner]))
     elif args['sort_by'] == 'top6':
         sorted_top6 = final_owner_to_top_half_or_bottom.items()
-        sorted_top6.sort(key=lambda tup: tup[1]) # sort by the top 6 performances
+        sorted_top6 = sorted(sorted_top6, key=lambda tup: tup[1]) # sort by the top 6 performances
         print("{0:<20}{1:<20}{2:<20}{3:<20}{4:<20}".format('Team', 'Top 6 Performances', 'Score', 'Record(W-L-T)', 'Average Rank'))
         for top6 in sorted_top6:
             owner = top6[0]
             print("{0:<20}{1:<20}{2:<20}{3:<20}{4:<20}".format(owner, top6[1], final_owner_to_score[owner], final_owner_to_record[owner], final_owner_to_rank[owner]))
     elif args['sort_by'] == 'score':
         sorted_scores = final_owner_to_score.items()
-        sorted_scores.sort(key=lambda tup: tup[1]) # sort by the scores
+        sorted_scores = sorted(sorted_scores, key=lambda tup: tup[1]) # sort by the scores
         print("{0:<20}{1:<20}{2:<20}{3:<20}{4:<20}".format('Team', 'Score', 'Record(W-L-T)', 'Top 6 Performances', 'Average Rank'))
         for score in sorted_scores:
             owner = score[0]
